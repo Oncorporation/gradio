@@ -22,6 +22,7 @@ class Tabs(BlockContext, metaclass=ComponentMeta):
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
+        sort_order: list[int | str] | None = None,
     ):
         """
         Parameters:
@@ -30,6 +31,7 @@ class Tabs(BlockContext, metaclass=ComponentMeta):
             elem_id: An optional string that is assigned as the id of this component in the HTML DOM. Can be used for targeting CSS styles.
             elem_classes: An optional string or list of strings that are assigned as the class of this component in the HTML DOM. Can be used for targeting CSS styles.
             render: If False, this layout will not be rendered in the Blocks context. Should be used if the intention is to assign event listeners now but render the component later.
+            sort_order: Optional list of identifiers (e.g. child Tab._id values) determining the order in which the tabs appear in the parent Tabs component. Lower values appear earlier. If not provided, tabs are shown in the order they were created.
         """
         BlockContext.__init__(
             self,
@@ -39,6 +41,45 @@ class Tabs(BlockContext, metaclass=ComponentMeta):
             render=render,
         )
         self.selected = selected
+        self.sort_order = sort_order
+
+    def sort_tabs(self):
+        """
+        Sort child tabs based on their sort_order attribute.
+        This is called automatically when all tabs have been added to the Tabs component.
+        """
+        if self.sort_order is not None:
+            # If parent Tabs has an explicit sort_order list, rearrange tabs according to it
+            sorted_children = []
+            remaining_children = self.children.copy()
+
+            # First add the tabs in the specified sort order
+            for tab_id in self.sort_order:
+                for i, child in enumerate(remaining_children):
+                    if isinstance(child, Tab) and child._id == tab_id:
+                        sorted_children.append(child)
+                        remaining_children.pop(i)
+                        break
+
+            # Then add any remaining tabs that weren't in the explicit sort_order
+            sorted_children.extend(remaining_children)
+            self.children = sorted_children
+        else:
+            # Otherwise sort tabs based on their individual sort_order values
+            tab_children = [child for child in self.children if isinstance(child, Tab)]
+            non_tab_children = [
+                child for child in self.children if not isinstance(child, Tab)
+            ]
+
+            # Sort only the Tab children based on their sort_order
+            tab_children.sort(
+                key=lambda tab: float("inf")
+                if tab.sort_order is None
+                else tab.sort_order
+            )
+
+            # Combine them back together
+            self.children = tab_children + non_tab_children
 
 
 @document()
@@ -46,13 +87,24 @@ class Tab(BlockContext, metaclass=ComponentMeta):
     """
     Tab (or its alias TabItem) is a layout element. Components defined within the Tab will be visible when this tab is selected tab.
     Example:
-        with gr.Blocks() as demo:
-            with gr.Tab("Lion"):
+    with gr.Blocks() as demo:
+        with gr.Tabs():
+            with gr.Tab("Lion", sort_order=3):
                 gr.Image("lion.jpg")
-                gr.Button("New Lion")
-            with gr.Tab("Tiger"):
+            with gr.Tab("Tiger", sort_order=1):
                 gr.Image("tiger.jpg")
-                gr.Button("New Tiger")
+            with gr.Tab("Cheetah", sort_order=2):
+                gr.Image(cheetah1.jpg")
+
+        with gr.Tabs() as tabs:
+            with gr.Tab("Lion") as tab1:
+                gr.Image("lion.jpg")
+            with gr.Tab("Tiger") as tab2:
+                gr.Image("tiger.jpg")
+            with gr.Tab("Cheetah") as tab3:
+                gr.Image("cheetah1.jpg")
+            gr.update(sort_order=[tab2._id, tab1._id, tab3._id])
+
     Guides: controlling-layout
     """
 
@@ -69,6 +121,7 @@ class Tab(BlockContext, metaclass=ComponentMeta):
         elem_classes: list[str] | str | None = None,
         scale: int | None = None,
         render: bool = True,
+        sort_order: int | None = None,
     ):
         """
         Parameters:
@@ -80,6 +133,7 @@ class Tab(BlockContext, metaclass=ComponentMeta):
             scale: relative size compared to adjacent elements. 1 or greater indicates the Tab will expand in size.
             visible: If False, Tab will be hidden.
             interactive: If False, Tab will not be clickable.
+            sort_order: Optional integer determining the order in which the tab appears in its parent Tabs component. Lower values appear earlier. If not provided, tabs are shown in the order they were created.
         """
         BlockContext.__init__(
             self,
@@ -92,12 +146,40 @@ class Tab(BlockContext, metaclass=ComponentMeta):
         self.visible = visible
         self.scale = scale
         self.interactive = interactive
+        self.sort_order = sort_order
 
     def get_expected_parent(self) -> type[Tabs]:
         return Tabs
 
     def get_block_name(self):
         return "tabitem"
+
+    def add_to_tabgroup(self, parent: Tabs) -> None:
+        """
+        Add this tab to a parent Tabs component with proper ordering.
+        Called internally by the Tabs component when the tab is added.
+        """
+        # If the parent has a sort_order list, use that to determine this tab's position
+        if parent.sort_order is not None:
+            # Add this Tab to the parent's children list at the position specified by sort_order
+            order = self.sort_order if self.sort_order is not None else float("inf")
+
+            # Insert tab in the right position based on sort_order
+            # Find the position where this tab should be inserted
+            i = 0
+            for i, child in enumerate(parent.children):
+                if isinstance(child, Tab):
+                    child_order = getattr(child, "sort_order", float("inf"))
+                    if order < child_order:
+                        break
+            else:
+                i = len(parent.children)  # Insert at end if no suitable position found
+
+            # Insert tab at position i
+            parent.children.insert(i, self)
+        else:
+            # Default behavior: append to the end
+            parent.children.append(self)
 
 
 TabItem = Tab
