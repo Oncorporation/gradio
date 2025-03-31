@@ -513,6 +513,17 @@ class BlockContext(Block):
         if getattr(self, "allow_expected_parents", True):
             self.fill_expected_parents()
 
+        # Special handling for sorting Tab components
+        from gradio.layouts.tabs import Tab, Tabs
+
+        if (
+            isinstance(self, Tab)
+            and isinstance(self.parent, Tabs)
+            and hasattr(self.parent, "sort_tabs")
+            and callable(self.parent.sort_tabs)
+        ):
+            self.parent.sort_tabs()
+
     def postprocess(self, y):
         """
         Any postprocessing needed to be performed on a block context.
