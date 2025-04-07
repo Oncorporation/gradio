@@ -35,6 +35,9 @@ gradio/hash_seed.txt
 
 tmp.zip
 
+# Visual Studio
+/.vs
+
 # Tests
 .coverage
 coverage.xml
@@ -98,3 +101,4 @@ js/storybook/theme.css
 
 # playwright
 .config/playwright/.cache
+/venv
