@@ -1,5 +1,39 @@
 # @gradio/model3d
 
+## 0.14.9
+
+### Fixes
+
+- [#10993](https://github.com/gradio-app/gradio/pull/10993) [`1918baa`](https://github.com/gradio-app/gradio/commit/1918baa178066dc94a8e1a559d4d62a52a3d8db4) - Update babylon.js and ensure the Model3D component autoplays on load.  Thanks @CedricGuillemet!
+
+### Dependency updates
+
+- @gradio/upload@0.16.1
+- @gradio/atoms@0.15.1
+- @gradio/statustracker@0.10.8
+- @gradio/icons@0.12.0
+
+## 0.14.8
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.7
+- @gradio/atoms@0.15.0
+- @gradio/icons@0.11.0
+- @gradio/upload@0.16.0
+
+## 0.14.7
+
+### Features
+
+- [#10847](https://github.com/gradio-app/gradio/pull/10847) [`d5fde7c`](https://github.com/gradio-app/gradio/commit/d5fde7c390004ce5394072100b059f545d2d4eae) - Babylon update for model3D.  Thanks @CedricGuillemet!
+
+### Dependency updates
+
+- @gradio/wasm@0.18.1
+- @gradio/client@1.14.1
+- @gradio/upload@0.15.7
+
 ## 0.14.6
 
 ### Dependency updates
