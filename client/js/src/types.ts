@@ -249,6 +249,7 @@ export interface Dependency {
 	backend_fn: boolean;
 	js: string | null;
 	scroll_to_output: boolean;
+	scroll_on_click: boolean;
 	trigger: "click" | "load" | string;
 	max_batch_size: number;
 	show_progress: "full" | "minimal" | "hidden";
@@ -317,6 +318,7 @@ export interface ClientOptions {
 	events?: EventType[];
 	headers?: Record<string, string>;
 	query_params?: Record<string, string>;
+	scroll_on_click?: boolean;
 }
 
 export interface FileData {
