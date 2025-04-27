@@ -19,9 +19,27 @@
 	export let icon: FileData | null = null;
 	export let link: string | null = null;
 	export let min_width: number | undefined = undefined;
+	export let scroll_on_click: boolean = false;
 	export let gradio: Gradio<{
 		click: never;
 	}>;
+	
+	// Function to handle scrolling to output
+	function handleClick() {
+			gradio.dispatch("click");
+    
+			if (scroll_on_click) {
+					// Need to find the output components and scroll to them
+					// This is similar to what happens on completion but triggered immediately
+					const outputBlocks = document.querySelectorAll('.output-html, .output-markdown, .output-image, .output-video, .output-audio, .gradio-container > div > div > div.output');
+        
+					if (outputBlocks.length > 0) {
+							setTimeout(() => {
+									outputBlocks[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+							}, 10);
+					}
+			}
+	}
 </script>
 
 <Button
@@ -36,7 +54,7 @@
 	{min_width}
 	{visible}
 	disabled={!interactive}
-	on:click={() => gradio.dispatch("click")}
+	on:click={handleClick}
 >
 	{value ?? ""}
 </Button>
