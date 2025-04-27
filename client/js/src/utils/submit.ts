@@ -204,7 +204,7 @@ export function submit(
 					fn_index,
 					trigger_id
 				};
-				if (options?.scroll_on_click) {
+				if (options?.scroll_on_click || dependency.scroll_on_click) {
 					setTimeout(() => {
 						const outputBlocks = document.querySelectorAll(
 							'.output-html, .output-markdown, .output-image, .output-video, .output-audio, .gradio-container > div > div > div.output'
