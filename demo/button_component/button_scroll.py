@@ -14,6 +14,8 @@ with gr.Blocks() as demo:
             btn2 = gr.Button("Process with scroll_to_output only", variant="secondary")
             btn3 = gr.Button("Process with Both scrolling", variant="secondary")
             btn4 = gr.Button("Process with no scrolling", variant="secondary")
+    with gr.Row():
+        gr.HTML(f"<p>gradio version:{gr.__version__}</p>")
     
     output = gr.Textbox(label="Output")
     

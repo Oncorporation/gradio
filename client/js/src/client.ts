@@ -191,6 +191,10 @@ export class Client {
 		if (!options.events) {
 			options.events = ["data"];
 		}
+		
+		if (options.scroll_on_click === undefined) {
+			options.scroll_on_click = false;
+		}
 
 		this.options = options;
 		this.current_payload = {};
