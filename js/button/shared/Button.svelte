@@ -6,7 +6,7 @@
 	export let elem_classes: string[] = [];
 	export let visible = true;
 	export let variant: "primary" | "secondary" | "stop" | "huggingface" =
-		"secondary";
+	"secondary";
 	export let size: "sm" | "md" | "lg" = "lg";
 	export let value: string | null = null;
 	export let link: string | null = null;
@@ -14,6 +14,7 @@
 	export let disabled = false;
 	export let scale: number | null = null;
 	export let min_width: number | undefined = undefined;
+	export let scroll_on_click: boolean = false;
 </script>
 
 {#if link && link.length > 0}

@@ -555,6 +555,7 @@ class BlockFunction:
         trigger_mode: Literal["always_last", "once", "multiple"] = "once",
         queue: bool = True,
         scroll_to_output: bool = False,
+        scroll_on_click: bool = False,
         show_api: bool = True,
         renderable: Renderable | None = None,
         rendered_in: Renderable | None = None,
@@ -596,6 +597,7 @@ class BlockFunction:
         self.trigger_mode = trigger_mode
         self.queue = False if fn is None else queue
         self.scroll_to_output = False if utils.get_space() else scroll_to_output
+        self.scroll_on_click = scroll_on_click
         self.show_api = show_api
         self.types_generator = inspect.isgeneratorfunction(
             self.fn
@@ -649,6 +651,7 @@ class BlockFunction:
             "queue": self.queue,
             "api_name": self.api_name,
             "scroll_to_output": self.scroll_to_output,
+            "scroll_on_click": self.scroll_on_click,
             "show_progress": self.show_progress,
             "show_progress_on": None
             if self.show_progress_on is None
@@ -757,6 +760,7 @@ class BlocksConfig:
         preprocess: bool = True,
         postprocess: bool = True,
         scroll_to_output: bool = False,
+        scroll_on_click: bool = False,
         show_progress: Literal["full", "minimal", "hidden"] = "full",
         show_progress_on: Component | Sequence[Component] | None = None,
         api_name: str | None | Literal[False] = None,
@@ -793,6 +797,7 @@ class BlocksConfig:
             preprocess: whether to run the preprocess methods of the input components before running the function
             postprocess: whether to run the postprocess methods of the output components after running the function
             scroll_to_output: whether to scroll to output of dependency on trigger
+            scroll_on_click: If True, will scroll to output component immediately when the event is triggered
             show_progress: how to show the progress animation while event is running: "full" shows a spinner which covers the output component area as well as a runtime display in the upper right corner, "minimal" only shows the runtime display, "hidden" shows no progress animation at all
             show_progress_on: Component or list of components to show the progress animation on. If None, will show the progress animation on all of the output components.
             api_name: defines how the endpoint appears in the API docs. Can be a string, None, or False. If set to a string, the endpoint will be exposed in the API docs with the given name. If None (default), the name of the function will be used as the API endpoint. If False, the endpoint will not be exposed in the API docs and downstream apps (including those that `gr.load` this app) will not be able to use this event.
@@ -943,6 +948,7 @@ class BlocksConfig:
             trigger_mode=trigger_mode,
             queue=queue,
             scroll_to_output=scroll_to_output,
+            scroll_on_click=scroll_on_click,
             show_api=show_api,
             renderable=renderable,
             rendered_in=rendered_in,

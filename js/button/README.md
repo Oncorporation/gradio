@@ -5,6 +5,14 @@
 	import { BaseButton } from "@gradio/button";
 	import { createEventDispatcher, tick, getContext } from "svelte";
 	const dispatch = createEventDispatcher();
+
+	function handleClick() {
+			gradio.dispatch("click");
+        
+			if (scroll_on_click) {
+				..
+			}
+	}
 </script>
 
 <BaseButton
@@ -20,7 +28,7 @@
 	{visible}
 	{root}
 	{root_url}
-	on:click={() => dispatch("click")}
+	on:click={"handleClick"}
 >
 	{"My Button"}
 </Button>

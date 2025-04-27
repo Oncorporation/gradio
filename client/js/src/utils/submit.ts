@@ -204,6 +204,16 @@ export function submit(
 					fn_index,
 					trigger_id
 				};
+				if (options?.scroll_on_click) {
+					setTimeout(() => {
+						const outputBlocks = document.querySelectorAll(
+							'.output-html, .output-markdown, .output-image, .output-video, .output-audio, .gradio-container > div > div > div.output'
+						);
+						if (outputBlocks.length > 0) {
+							outputBlocks[0].scrollIntoView({ behavior: "smooth", block: "nearest" });
+						}
+					}, 10);
+				}
 				if (skip_queue(fn_index, config)) {
 					fire_event({
 						type: "status",

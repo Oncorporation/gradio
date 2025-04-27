@@ -27,6 +27,7 @@ INTERFACE_TEMPLATE = '''
         outputs: Block | Sequence[Block] | None = None,
         api_name: str | None | Literal[False] = None,
         scroll_to_output: bool = False,
+        scroll_on_click: bool = False,
         show_progress: Literal["full", "minimal", "hidden"] = "full",
         show_progress_on: Component | Sequence[Component] | None = None,
         queue: bool | None = None,
@@ -53,6 +54,7 @@ INTERFACE_TEMPLATE = '''
             outputs: list of gradio.components to use as outputs. If the function returns no outputs, this should be an empty list.
             api_name: defines how the endpoint appears in the API docs. Can be a string, None, or False. If False, the endpoint will not be exposed in the api docs. If set to None, will use the functions name as the endpoint route. If set to a string, the endpoint will be exposed in the api docs with the given name.
             scroll_to_output: if True, will scroll to output component on completion
+            scroll_on_click: If True, will scroll to output component immediately when the event is triggered
             show_progress: how to show the progress animation while event is running: "full" shows a spinner which covers the output component area as well as a runtime display in the upper right corner, "minimal" only shows the runtime display, "hidden" shows no progress animation at all
             show_progress_on: Component or list of components to show the progress animation on. If None, will show the progress animation on all of the output components.
             queue: if True, will place the request on the queue, if the queue has been enabled. If False, will not put this event on the queue, even if the queue has been enabled. If None, will use the queue setting of the gradio app.

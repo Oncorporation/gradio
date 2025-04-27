@@ -578,6 +578,7 @@ class EventListener(str):
             | None = None,
             api_name: str | None | Literal[False] = None,
             scroll_to_output: bool = False,
+            scroll_on_click: bool = False,
             show_progress: Literal["full", "minimal", "hidden"] = _show_progress,
             show_progress_on: Component | Sequence[Component] | None = None,
             queue: bool = True,
@@ -603,6 +604,7 @@ class EventListener(str):
                 outputs: List of gradio.components to use as outputs. If the function returns no outputs, this should be an empty list.
                 api_name: defines how the endpoint appears in the API docs. Can be a string, None, or False. If set to a string, the endpoint will be exposed in the API docs with the given name. If None (default), the name of the function will be used as the API endpoint. If False, the endpoint will not be exposed in the API docs and downstream apps (including those that `gr.load` this app) will not be able to use this event.
                 scroll_to_output: If True, will scroll to output component on completion
+                scroll_on_click: If True, will scroll to output component immediately when the event is triggered
                 show_progress: how to show the progress animation while event is running: "full" shows a spinner which covers the output component area as well as a runtime display in the upper right corner, "minimal" only shows the runtime display, "hidden" shows no progress animation at all
                 show_progress_on: Component or list of components to show the progress animation on. If None, will show the progress animation on all of the output components.
                 queue: If True, will place the request on the queue, if the queue has been enabled. If False, will not put this event on the queue, even if the queue has been enabled. If None, will use the queue setting of the gradio app.
@@ -629,6 +631,7 @@ class EventListener(str):
                         outputs=outputs,
                         api_name=api_name,
                         scroll_to_output=scroll_to_output,
+                        scroll_on_click=scroll_on_click,
                         show_progress=show_progress,
                         show_progress_on=show_progress_on,
                         queue=queue,
@@ -678,6 +681,7 @@ class EventListener(str):
                 preprocess=preprocess,
                 postprocess=postprocess,
                 scroll_to_output=scroll_to_output,
+                scroll_on_click=scroll_on_click,
                 show_progress=show_progress,
                 show_progress_on=show_progress_on,
                 api_name=api_name,
@@ -746,6 +750,7 @@ def on(
     *,
     api_name: str | None | Literal[False] = None,
     scroll_to_output: bool = False,
+    scroll_on_click: bool = False,
     show_progress: Literal["full", "minimal", "hidden"] = "full",
     show_progress_on: Component | Sequence[Component] | None = None,
     queue: bool = True,
@@ -775,6 +780,7 @@ def on(
         outputs: List of gradio.components to use as outputs. If the function returns no outputs, this should be an empty list.
         api_name: Defines how the endpoint appears in the API docs. Can be a string, None, or False. If False, the endpoint will not be exposed in the api docs. If set to None, will use the functions name as the endpoint route. If set to a string, the endpoint will be exposed in the api docs with the given name.
         scroll_to_output: If True, will scroll to output component on completion
+        scroll_on_click: If True, will scroll to output component immediately when the event is triggered
         show_progress: how to show the progress animation while event is running: "full" shows a spinner which covers the output component area as well as a runtime display in the upper right corner, "minimal" only shows the runtime display, "hidden" shows no progress animation at all,
         show_progress_on: Component or list of components to show the progress animation on. If None, will show the progress animation on all of the output components.
         queue: If True, will place the request on the queue, if the queue has been enabled. If False, will not put this event on the queue, even if the queue has been enabled. If None, will use the queue setting of the gradio app.
@@ -824,6 +830,7 @@ def on(
                 outputs=outputs,
                 api_name=api_name,
                 scroll_to_output=scroll_to_output,
+                scroll_on_click=scroll_on_click,
                 show_progress=show_progress,
                 show_progress_on=show_progress_on,
                 queue=queue,
@@ -877,6 +884,7 @@ def on(
         preprocess=preprocess,
         postprocess=postprocess,
         scroll_to_output=scroll_to_output,
+        scroll_on_click=scroll_on_click,
         show_progress=show_progress,
         show_progress_on=show_progress_on,
         api_name=api_name,
@@ -1015,6 +1023,7 @@ def api(
         preprocess=False,
         postprocess=False,
         scroll_to_output=False,
+        scroll_on_click=False,
         show_progress="hidden",
         api_name=api_name,
         js=None,
@@ -1040,9 +1049,27 @@ class Events:
         "input",
         doc="This listener is triggered when the user changes the value of the {{ component }}.",
     )
-    click = EventListener("click", doc="Triggered when the {{ component }} is clicked.")
+    click = EventListener(
+        "click",
+        doc="Triggered when the {{ component }} is clicked.",
+        event_specific_args=[
+            {
+                "name": "scroll_on_click",
+                "type": "bool = False",
+                "doc": "If True, will scroll to output component immediately when the event is triggered.",
+            }
+        ],
+    )
     double_click = EventListener(
-        "double_click", doc="Triggered when the {{ component }} is double clicked."
+        "double_click",
+        doc="Triggered when the {{ component }} is double clicked.",
+        event_specific_args=[
+            {
+                "name": "scroll_on_click",
+                "type": "bool = False",
+                "doc": "If True, will scroll to output component immediately when the event is triggered.",
+            }
+        ],
     )
     submit = EventListener(
         "submit",
