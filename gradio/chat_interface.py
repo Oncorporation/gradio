@@ -12,7 +12,7 @@ import os
 import warnings
 from collections.abc import AsyncGenerator, Callable, Generator, Sequence
 from pathlib import Path
-from typing import Literal, Union, cast
+from typing import Any, Literal, Union, cast
 
 import anyio
 from gradio_client.documentation import document
@@ -45,6 +45,7 @@ from gradio.events import Dependency, EditData, SelectData
 from gradio.flagging import ChatCSVLogger
 from gradio.helpers import create_examples as Examples  # noqa: N812
 from gradio.helpers import special_args, update
+from gradio.i18n import I18nData
 from gradio.layouts import Accordion, Column, Group, Row
 from gradio.routes import Request
 from gradio.themes import ThemeClass as Theme
@@ -88,7 +89,7 @@ class ChatInterface(Blocks):
         run_examples_on_click: bool = True,
         cache_examples: bool | None = None,
         cache_mode: Literal["eager", "lazy"] | None = None,
-        title: str | None = None,
+        title: str | I18nData | None = None,
         description: str | None = None,
         theme: Theme | str | None = None,
         flagging_mode: Literal["never", "manual"] | None = None,
@@ -439,8 +440,8 @@ class ChatInterface(Blocks):
                                 "mime_type": "text",  # for internal use, not a valid mime type
                                 "meta": {"_type": "gradio.FileData"},
                             }
-                    elif example_icons:
-                        example_message["icon"] = example_icons[index]
+                elif example_icons:
+                    example_message["icon"] = example_icons[index]
                 examples_messages.append(example_message)
         return examples_messages
 
@@ -461,6 +462,19 @@ class ChatInterface(Blocks):
             title = title[:40] + "..."
         return title or "Conversation"
 
+    @staticmethod
+    def serialize_components(conversation: list[MessageDict]) -> list[MessageDict]:
+        def inner(obj: Any) -> Any:
+            if isinstance(obj, list):
+                return [inner(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {k: inner(v) for k, v in obj.items()}
+            elif isinstance(obj, Component):
+                return obj.value
+            return obj
+
+        return inner(conversation)
+
     def _save_conversation(
         self,
         index: int | None,
@@ -468,11 +482,12 @@ class ChatInterface(Blocks):
         saved_conversations: list[list[MessageDict]],
     ):
         if self.save_history:
+            serialized_conversation = self.serialize_components(conversation)
             if index is not None:
-                saved_conversations[index] = conversation
+                saved_conversations[index] = serialized_conversation
             else:
                 saved_conversations = saved_conversations or []
-                saved_conversations.insert(0, conversation)
+                saved_conversations.insert(0, serialized_conversation)
                 index = 0
         return index, saved_conversations
 
@@ -504,13 +519,13 @@ class ChatInterface(Blocks):
             Chatbot(
                 value=conversations[index],  # type: ignore
                 feedback_value=[],
+                type="messages",
             ),
         )
 
     def _setup_events(self) -> None:
         from gradio import on
 
-        submit_triggers = [self.textbox.submit, self.chatbot.retry]
         submit_fn = self._stream_fn if self.is_generator else self._submit_fn
 
         synchronize_chat_state_kwargs = {
@@ -580,6 +595,7 @@ class ChatInterface(Blocks):
             postprocess=False,
         )
 
+        example_select_event = None
         if (
             isinstance(self.chatbot, Chatbot)
             and self.examples
@@ -596,7 +612,7 @@ class ChatInterface(Blocks):
                     example_select_event = example_select_event.then(**submit_fn_kwargs)
                 example_select_event.then(**synchronize_chat_state_kwargs)
             else:
-                self.chatbot.example_select(
+                example_select_event = self.chatbot.example_select(
                     self.example_populated,
                     None,
                     [self.textbox],
@@ -631,7 +647,18 @@ class ChatInterface(Blocks):
             show_api=False,
         ).then(**save_fn_kwargs)
 
-        self._setup_stop_events(submit_triggers, [submit_event, retry_event])
+        events_to_cancel = [submit_event, retry_event]
+        if example_select_event is not None:
+            events_to_cancel.append(example_select_event)
+
+        self._setup_stop_events(
+            event_triggers=[
+                self.textbox.submit,
+                self.chatbot.retry,
+                self.chatbot.example_select,
+            ],
+            events_to_cancel=events_to_cancel,
+        )
 
         self.chatbot.undo(
             self._pop_last_user_message,
@@ -725,40 +752,39 @@ class ChatInterface(Blocks):
         self, event_triggers: list[Callable], events_to_cancel: list[Dependency]
     ) -> None:
         textbox_component = MultimodalTextbox if self.multimodal else Textbox
-        if self.is_generator:
-            original_submit_btn = self.textbox.submit_btn
-            for event_trigger in event_triggers:
-                event_trigger(
-                    utils.async_lambda(
-                        lambda: textbox_component(
-                            submit_btn=False,
-                            stop_btn=self.original_stop_btn,
-                        )
-                    ),
-                    None,
-                    [self.textbox],
-                    show_api=False,
-                    queue=False,
-                )
-            for event_to_cancel in events_to_cancel:
-                event_to_cancel.then(
-                    utils.async_lambda(
-                        lambda: textbox_component(
-                            submit_btn=original_submit_btn, stop_btn=False
-                        )
-                    ),
-                    None,
-                    [self.textbox],
-                    show_api=False,
-                    queue=False,
-                )
-            self.textbox.stop(
+        original_submit_btn = self.textbox.submit_btn
+        for event_trigger in event_triggers:
+            event_trigger(
+                utils.async_lambda(
+                    lambda: textbox_component(
+                        submit_btn=False,
+                        stop_btn=self.original_stop_btn,
+                    )
+                ),
                 None,
-                None,
-                None,
-                cancels=events_to_cancel,  # type: ignore
+                [self.textbox],
                 show_api=False,
+                queue=False,
             )
+        for event_to_cancel in events_to_cancel:
+            event_to_cancel.then(
+                utils.async_lambda(
+                    lambda: textbox_component(
+                        submit_btn=original_submit_btn, stop_btn=False
+                    )
+                ),
+                None,
+                [self.textbox],
+                show_api=False,
+                queue=False,
+            )
+        self.textbox.stop(
+            None,
+            None,
+            None,
+            cancels=events_to_cancel,  # type: ignore
+            show_api=False,
+        )
 
     def _clear_and_save_textbox(
         self,

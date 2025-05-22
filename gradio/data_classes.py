@@ -19,6 +19,7 @@ from typing import (
 )
 
 from fastapi import Request
+from gradio_client.data_classes import ParameterInfo
 from gradio_client.documentation import document
 from gradio_client.utils import is_file_obj_with_meta, traverse
 from pydantic import (
@@ -35,6 +36,8 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import NotRequired, TypedDict
+
+from gradio.i18n import I18nData
 
 try:
     from pydantic import JsonValue
@@ -376,7 +379,7 @@ class BlocksConfigDict(TypedDict):
     connect_heartbeat: bool
     js: str | Literal[True] | None
     head: str | None
-    title: str
+    title: str | I18nData
     space_id: str | None
     enable_queue: bool
     show_error: bool
@@ -399,6 +402,8 @@ class BlocksConfigDict(TypedDict):
     page: dict[str, Page]
     pages: list[tuple[str, str]]
     current_page: NotRequired[str]
+    i18n_translations: NotRequired[dict[str, dict[str, str]] | None]
+    mcp_server: NotRequired[bool]
 
 
 class MediaStreamChunk(TypedDict):
@@ -428,3 +433,22 @@ class ImageData(GradioModel):
 
 class Base64ImageData(GradioModel):
     url: str = Field(description="base64 encoded image")
+
+
+class APIReturnInfo(TypedDict):
+    label: str
+    type: dict[str, Any]
+    python_type: dict[str, str]
+    component: str
+
+
+class APIEndpointInfo(TypedDict):
+    description: NotRequired[str]
+    parameters: list[ParameterInfo]
+    returns: list[APIReturnInfo]
+    show_api: bool
+
+
+class APIInfo(TypedDict):
+    named_endpoints: dict[str, APIEndpointInfo]
+    unnamed_endpoints: dict[str, APIEndpointInfo]

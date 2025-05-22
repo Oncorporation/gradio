@@ -1,5 +1,52 @@
 # @gradio/video
 
+## 0.14.14
+
+### Fixes
+
+- [#11117](https://github.com/gradio-app/gradio/pull/11117) [`9b976b7`](https://github.com/gradio-app/gradio/commit/9b976b750a61368f369bcefaacda6d4fb0975c5f) - Raise UI error if video not playable in the browser.  Thanks @freddyaboulton!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+- @gradio/atoms@0.16.1
+- @gradio/client@1.15.0
+- @gradio/upload@0.16.5
+- @gradio/image@0.22.6
+
+## 0.14.13
+
+### Dependency updates
+
+- @gradio/upload@0.16.4
+- @gradio/image@0.22.5
+
+## 0.14.12
+
+### Dependency updates
+
+- @gradio/image@0.22.4
+
+## 0.14.11
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+- @gradio/image@0.22.3
+- @gradio/upload@0.16.3
+- @gradio/atoms@0.16.0
+
+## 0.14.10
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/atoms@0.15.2
+- @gradio/client@1.14.2
+- @gradio/utils@0.10.2
+- @gradio/upload@0.16.2
+- @gradio/image@0.22.2
+
 ## 0.14.9
 
 ### Fixes

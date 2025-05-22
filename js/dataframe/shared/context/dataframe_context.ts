@@ -34,6 +34,11 @@ interface DataFrameState {
 	sort_state: {
 		sort_columns: { col: number; direction: SortDirection }[];
 		row_order: number[];
+		initial_data: {
+			data: { id: string; value: string | number }[][];
+			display_value: string[][] | null;
+			styling: string[][] | null;
+		} | null;
 	};
 	ui_state: {
 		active_cell_menu: { row: number; col: number; x: number; y: number } | null;
@@ -149,12 +154,16 @@ export interface DataFrameContext {
 	actions: DataFrameActions;
 	data?: any[][];
 	headers?: { id: string; value: string }[];
+	display_value?: string[][] | null;
+	styling?: string[][] | null;
 	els?: Record<
 		string,
 		{ cell: HTMLTableCellElement | null; input: HTMLInputElement | null }
 	>;
 	parent_element?: HTMLElement;
 	get_data_at?: (row: number, col: number) => string | number;
+	get_column?: (col: number) => (string | number)[];
+	get_row?: (row: number) => (string | number)[];
 	dispatch?: (e: "change" | "select" | "search", detail?: any) => void;
 }
 
@@ -215,8 +224,27 @@ function create_actions(
 				) {
 					sort_cols.push({ col, direction });
 				}
+
+				const initial_data =
+					s.sort_state.initial_data ||
+					(context.data && sort_cols.length > 0
+						? {
+								data: JSON.parse(JSON.stringify(context.data)),
+								display_value: context.display_value
+									? JSON.parse(JSON.stringify(context.display_value))
+									: null,
+								styling: context.styling
+									? JSON.parse(JSON.stringify(context.styling))
+									: null
+							}
+						: null);
+
 				return {
-					sort_state: { ...s.sort_state, sort_columns: sort_cols.slice(-3) }
+					sort_state: {
+						...s.sort_state,
+						sort_columns: sort_cols.slice(-3),
+						initial_data: initial_data
+					}
 				};
 			}),
 		get_sort_status: (name, headers) => {
@@ -317,7 +345,7 @@ function create_actions(
 			) {
 				if (!dequal(current_headers, previous_headers)) {
 					update_state((s) => ({
-						sort_state: { sort_columns: [], row_order: [] }
+						sort_state: { sort_columns: [], row_order: [], initial_data: null }
 					}));
 				}
 				dispatch("change", {
@@ -329,9 +357,35 @@ function create_actions(
 			}
 		},
 		reset_sort_state: () =>
-			update_state((s) => ({
-				sort_state: { sort_columns: [], row_order: [] }
-			})),
+			update_state((s) => {
+				if (s.sort_state.initial_data && context.data) {
+					const original = s.sort_state.initial_data;
+
+					const update_array = (
+						source:
+							| { id: string; value: string | number }[][]
+							| string[][]
+							| null,
+						target: any[] | null | undefined
+					): void => {
+						if (source && target) {
+							target.splice(
+								0,
+								target.length,
+								...JSON.parse(JSON.stringify(source))
+							);
+						}
+					};
+
+					update_array(original.data, context.data);
+					update_array(original.display_value, context.display_value);
+					update_array(original.styling, context.styling);
+				}
+
+				return {
+					sort_state: { sort_columns: [], row_order: [], initial_data: null }
+				};
+			}),
 		set_active_cell_menu: (menu) =>
 			update_state((s) => ({
 				ui_state: { ...s.ui_state, active_cell_menu: menu }
@@ -467,6 +521,8 @@ function create_actions(
 
 			context.dispatch?.("select", {
 				index: [actual_row, col],
+				col_value: context.get_column!(col),
+				row_value: context.get_row!(actual_row),
 				value: context.get_data_at!(actual_row, col)
 			});
 		},
@@ -542,7 +598,7 @@ export function create_dataframe_context(
 	const state = writable<DataFrameState>({
 		config,
 		current_search_query: null,
-		sort_state: { sort_columns: [], row_order: [] },
+		sort_state: { sort_columns: [], row_order: [], initial_data: null },
 		ui_state: {
 			active_cell_menu: null,
 			active_header_menu: null,

@@ -45,6 +45,7 @@
 		"download": "Télécharger",
 		"edit": "Modifier",
 		"empty": "Vide",
+		"flag": "Marquer",
 		"error": "Erreur",
 		"hosted_on": "Hébergé sur",
 		"loading": "Chargement",
@@ -58,7 +59,8 @@
 		"no_devices": "Aucun périphérique trouvé",
 		"language": "Langue",
 		"display_theme": "Thème d'affichage",
-		"pwa": "Application web progressive"
+		"pwa": "Application web progressive",
+		"run": "Exécuter"
 	},
 	"dataframe": {
 		"incorrect_format": "Format incorrect, seuls les fichiers CSV et TSV sont pris en charge",
@@ -87,7 +89,8 @@
 		"runtime_error": "il y a une erreur d'exécution",
 		"space_not_working": "\"Le Space ne fonctionne pas car\" {0}",
 		"space_paused": "le Space est en pause",
-		"use_via_api": "Utiliser via l'API"
+		"use_via_api": "Utiliser via API",
+		"use_via_api_or_mcp": "Utiliser via API ou MCP"
 	},
 	"file": {
 		"uploading": "Téléchargement..."

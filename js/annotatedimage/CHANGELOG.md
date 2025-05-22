@@ -1,5 +1,42 @@
 # @gradio/annotatedimage
 
+## 0.9.19
+
+### Features
+
+- [#11177](https://github.com/gradio-app/gradio/pull/11177) [`3068196`](https://github.com/gradio-app/gradio/commit/3068196d47234fd1c1634f33b9ddfc089f5cbbe0) - Improved, smoother fullscreen mode for components.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+- @gradio/atoms@0.16.1
+- @gradio/client@1.15.0
+- @gradio/upload@0.16.5
+
+## 0.9.18
+
+### Dependency updates
+
+- @gradio/upload@0.16.4
+
+## 0.9.17
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+- @gradio/upload@0.16.3
+- @gradio/atoms@0.16.0
+
+## 0.9.16
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/atoms@0.15.2
+- @gradio/client@1.14.2
+- @gradio/utils@0.10.2
+- @gradio/upload@0.16.2
+
 ## 0.9.15
 
 ### Dependency updates

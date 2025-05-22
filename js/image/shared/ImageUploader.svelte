@@ -42,6 +42,7 @@
 	let upload_input: Upload;
 	export let uploading = false;
 	export let active_source: source_type = null;
+	export let fullscreen = false;
 
 	async function handle_upload({
 		detail
@@ -57,6 +58,8 @@
 			} else {
 				value = detail;
 			}
+
+			await tick();
 			dispatch("upload");
 		}
 	}
@@ -132,6 +135,31 @@
 	}
 
 	let image_container: HTMLElement;
+
+	function on_drag_over(evt: DragEvent): void {
+		evt.preventDefault();
+		evt.stopPropagation();
+		if (evt.dataTransfer) {
+			evt.dataTransfer.dropEffect = "copy";
+		}
+
+		dragging = true;
+	}
+
+	async function on_drop(evt: DragEvent): Promise<void> {
+		evt.preventDefault();
+		evt.stopPropagation();
+		dragging = false;
+
+		if (value) {
+			handle_clear();
+			await tick();
+		}
+
+		active_source = "upload";
+		await tick();
+		upload_input.load_files_from_drop(evt);
+	}
 </script>
 
 <BlockLabel {show_label} Icon={ImageIcon} label={label || "Image"} />
@@ -140,7 +168,7 @@
 	<IconButtonWrapper>
 		{#if value?.url && !active_streaming}
 			{#if show_fullscreen_button}
-				<FullscreenButton container={image_container} />
+				<FullscreenButton {fullscreen} on:fullscreen />
 			{/if}
 			<IconButton
 				Icon={Clear}
@@ -153,10 +181,13 @@
 			/>
 		{/if}
 	</IconButtonWrapper>
+	<!-- svelte-ignore a11y-no-static-element-interactions -->
 	<div
 		class="upload-container"
 		class:reduced-height={sources.length > 1}
 		style:width={value ? "auto" : "100%"}
+		on:dragover={on_drag_over}
+		on:drop={on_drop}
 	>
 		<Upload
 			hidden={value !== null || active_source === "webcam"}
@@ -248,5 +279,11 @@
 
 	.selectable {
 		cursor: crosshair;
+	}
+
+	.image-frame {
+		object-fit: cover;
+		width: 100%;
+		height: 100%;
 	}
 </style>

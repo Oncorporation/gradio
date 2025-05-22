@@ -1,5 +1,74 @@
 # @gradio/chatbot
 
+## 0.26.7
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+- @gradio/atoms@0.16.1
+- @gradio/client@1.15.0
+- @gradio/upload@0.16.5
+- @gradio/image@0.22.6
+- @gradio/video@0.14.14
+- @gradio/gallery@0.15.19
+- @gradio/plot@0.9.16
+
+## 0.26.6
+
+### Fixes
+
+- [#11158](https://github.com/gradio-app/gradio/pull/11158) [`56ab579`](https://github.com/gradio-app/gradio/commit/56ab5799fab715e36fb540c580fd03ed0113a26c) - gr.Chatbot: Style fixes to remove multiple scrollbars.  Thanks @aymeric-roucher!
+
+## 0.26.5
+
+### Dependency updates
+
+- @gradio/video@0.14.13
+- @gradio/upload@0.16.4
+- @gradio/image@0.22.5
+- @gradio/gallery@0.15.18
+
+## 0.26.4
+
+### Fixes
+
+- [#11097](https://github.com/gradio-app/gradio/pull/11097) [`bb5a3c5`](https://github.com/gradio-app/gradio/commit/bb5a3c5b6b4459fb4d491bcc5a625e7fee7e502c) - Fix #10320: Chatbot - Ensure all messages in a group are editable.  Thanks @eduardopalricas33!
+
+## 0.26.3
+
+### Dependency updates
+
+- @gradio/gallery@0.15.17
+- @gradio/video@0.14.12
+- @gradio/image@0.22.4
+
+## 0.26.2
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+- @gradio/image@0.22.3
+- @gradio/upload@0.16.3
+- @gradio/video@0.14.11
+- @gradio/atoms@0.16.0
+- @gradio/gallery@0.15.16
+- @gradio/plot@0.9.15
+
+## 0.26.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/video@0.14.10
+- @gradio/atoms@0.15.2
+- @gradio/client@1.14.2
+- @gradio/markdown-code@0.4.3
+- @gradio/utils@0.10.2
+- @gradio/upload@0.16.2
+- @gradio/image@0.22.2
+- @gradio/gallery@0.15.15
+- @gradio/plot@0.9.14
+
 ## 0.26.0
 
 ### Features

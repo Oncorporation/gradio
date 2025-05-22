@@ -76,6 +76,7 @@
 	export let show_search: "none" | "search" | "filter" = "none";
 	export let pinned_columns = 0;
 	export let static_columns: (string | number)[] = [];
+	export let fullscreen = false;
 
 	const df_ctx = create_dataframe_context({
 		show_fullscreen_button,
@@ -111,6 +112,8 @@
 	onMount(() => {
 		df_ctx.parent_element = parent;
 		df_ctx.get_data_at = get_data_at;
+		df_ctx.get_column = get_column;
+		df_ctx.get_row = get_row;
 		df_ctx.dispatch = dispatch;
 		init_drag_handlers();
 
@@ -125,23 +128,22 @@
 		observer.observe(parent);
 		document.addEventListener("click", handle_click_outside);
 		window.addEventListener("resize", handle_resize);
-		document.addEventListener("fullscreenchange", handle_fullscreen_change);
 
 		return () => {
 			observer.disconnect();
 			document.removeEventListener("click", handle_click_outside);
 			window.removeEventListener("resize", handle_resize);
-			document.removeEventListener(
-				"fullscreenchange",
-				handle_fullscreen_change
-			);
 		};
 	});
 
-	$: if (data || _headers || els) {
-		df_ctx.data = data;
-		df_ctx.headers = _headers;
-		df_ctx.els = els;
+	$: {
+		if (data || _headers || els) {
+			df_ctx.data = data;
+			df_ctx.headers = _headers;
+			df_ctx.els = els;
+			df_ctx.display_value = display_value;
+			df_ctx.styling = styling;
+		}
 	}
 
 	const dispatch = createEventDispatcher<{
@@ -167,7 +169,6 @@
 		display_value?: string;
 		styling?: string;
 	}[][] = [[]];
-	let is_fullscreen = false;
 	let dragging = false;
 	let color_accent_copied: string;
 	let filtered_to_original_map: number[] = [];
@@ -185,6 +186,12 @@
 
 	const get_data_at = (row: number, col: number): string | number =>
 		data?.[row]?.[col]?.value;
+
+	const get_column = (col: number): (string | number)[] =>
+		data?.map((row) => row[col]?.value) ?? [];
+
+	const get_row = (row: number): (string | number)[] =>
+		data?.[row]?.map((cell) => cell.value) ?? [];
 
 	$: {
 		if (!dequal(headers, old_headers)) {
@@ -240,6 +247,9 @@
 			df_actions.reset_sort_state();
 		} else if ($df_state.sort_state.sort_columns.length > 0) {
 			sort_data(data, display_value, styling);
+		} else {
+			df_actions.handle_sort(-1, "asc");
+			df_actions.reset_sort_state();
 		}
 
 		if ($df_state.current_search_query) {
@@ -268,7 +278,10 @@
 			row.forEach((cell, col_idx) => {
 				cell_map.set(cell.id, {
 					value: cell.value,
-					display_value: cell.display_value || String(cell.value),
+					display_value:
+						cell.display_value !== undefined
+							? cell.display_value
+							: String(cell.value),
 					styling: styling?.[row_idx]?.[col_idx] || ""
 				});
 			});
@@ -281,7 +294,10 @@
 				const original = cell_map.get(cell.id);
 				return {
 					...cell,
-					display_value: original?.display_value || String(cell.value),
+					display_value:
+						original?.display_value !== undefined
+							? original.display_value
+							: String(cell.value),
 					styling: original?.styling || ""
 				};
 			})
@@ -315,7 +331,6 @@
 
 	function clear_sort(): void {
 		df_actions.reset_sort_state();
-		sort_data(data, display_value, styling);
 	}
 
 	$: if ($df_state.sort_state.sort_columns.length > 0) {
@@ -511,20 +526,6 @@
 		handle_cell_blur(blur_event, df_ctx, coords);
 	}
 
-	function toggle_fullscreen(): void {
-		if (!document.fullscreenElement) {
-			parent.requestFullscreen();
-			is_fullscreen = true;
-		} else {
-			document.exitFullscreen();
-			is_fullscreen = false;
-		}
-	}
-
-	function handle_fullscreen_change(): void {
-		is_fullscreen = !!document.fullscreenElement;
-	}
-
 	function toggle_header_menu(event: MouseEvent, col: number): void {
 		event.stopPropagation();
 		if (active_header_menu && active_header_menu.col === col) {
@@ -601,7 +602,11 @@
 
 				row.forEach((cell) => {
 					data_row.push(cell.value);
-					display_row.push(cell.display_value || String(cell.value));
+					display_row.push(
+						cell.display_value !== undefined
+							? cell.display_value
+							: String(cell.value)
+					);
 					styling_row.push(cell.styling || "");
 				});
 
@@ -705,14 +710,15 @@
 		const is_search_active = $df_state.current_search_query !== undefined;
 
 		if (is_search_active && search_results?.[row]?.[col]) {
-			return (
-				search_results[row][col].display_value ||
-				String(search_results[row][col].value)
-			);
+			return search_results[row][col].display_value !== undefined
+				? search_results[row][col].display_value
+				: String(search_results[row][col].value);
 		}
 
 		if (data?.[row]?.[col]) {
-			return data[row][col].display_value || String(data[row][col].value);
+			return data[row][col].display_value !== undefined
+				? data[row][col].display_value
+				: String(data[row][col].value);
 		}
 
 		return "";
@@ -731,12 +737,12 @@
 			{/if}
 			<Toolbar
 				{show_fullscreen_button}
-				{is_fullscreen}
-				on:click={toggle_fullscreen}
+				{fullscreen}
 				on_copy={async () => await copy_table_data(data, null)}
 				{show_copy_button}
 				{show_search}
 				on:search={(e) => df_actions.handle_search(e.detail)}
+				on:fullscreen
 				on_commit_filter={commit_filter}
 				current_search_query={$df_state.current_search_query}
 			/>

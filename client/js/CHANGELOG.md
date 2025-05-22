@@ -1,5 +1,18 @@
 # @gradio/client
 
+## 1.15.0
+
+### Features
+
+- [#11155](https://github.com/gradio-app/gradio/pull/11155) [`30a1d9e`](https://github.com/gradio-app/gradio/commit/30a1d9e2ac3013d9c844b236410010bce97ffaf5) - Improvements to MCP page.  Thanks @abidlabs!
+- [#11047](https://github.com/gradio-app/gradio/pull/11047) [`6d4b8a7`](https://github.com/gradio-app/gradio/commit/6d4b8a7f10daefc9c79aa224635da23fbaeebb76) - Implement custom i18n.  Thanks @hannahblair!
+
+## 1.14.2
+
+### Fixes
+
+- [#11017](https://github.com/gradio-app/gradio/pull/11017) [`734b309`](https://github.com/gradio-app/gradio/commit/734b3099d79647695e635d87726666d4b28d1bcf) - Include HF token in stream requests.  Thanks @nostalgebraist!
+
 ## 1.14.1
 
 ### Features

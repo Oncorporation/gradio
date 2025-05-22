@@ -1,5 +1,24 @@
 # @gradio/atoms
 
+## 0.16.1
+
+### Features
+
+- [#11177](https://github.com/gradio-app/gradio/pull/11177) [`3068196`](https://github.com/gradio-app/gradio/commit/3068196d47234fd1c1634f33b9ddfc089f5cbbe0) - Improved, smoother fullscreen mode for components.  Thanks @aliabid94!
+
+## 0.16.0
+
+### Features
+
+- [#11027](https://github.com/gradio-app/gradio/pull/11027) [`eff532b`](https://github.com/gradio-app/gradio/commit/eff532b913a3c8f06f10a4f9471d3177e3744053) - Add new `ImageSlider` component.  Thanks @pngwn!
+
+## 0.15.2
+
+### Dependency updates
+
+- @gradio/markdown-code@0.4.3
+- @gradio/utils@0.10.2
+
 ## 0.15.1
 
 ### Dependency updates

@@ -5,21 +5,19 @@ from __future__ import annotations
 import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
-from urllib.parse import quote
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import PIL.Image
 from gradio_client import handle_file
 from gradio_client.documentation import document
-from PIL import ImageOps
 
 from gradio import image_utils, utils
 from gradio.components.base import Component, StreamingInput
 from gradio.components.image_editor import WebcamOptions
 from gradio.data_classes import Base64ImageData, ImageData
 from gradio.events import Events
-from gradio.exceptions import Error
+from gradio.i18n import I18nData
 
 if TYPE_CHECKING:
     from gradio.components import Timer
@@ -46,6 +44,12 @@ class Image(StreamingInput, Component):
     ]
 
     data_model = ImageData
+    image_mode: (
+        Literal["1", "L", "P", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
+        | None
+    )
+
+    type: Literal["numpy", "pil", "filepath"]
 
     def __init__(
         self,
@@ -66,7 +70,7 @@ class Image(StreamingInput, Component):
             | None
         ) = None,
         type: Literal["numpy", "pil", "filepath"] = "numpy",
-        label: str | None = None,
+        label: str | I18nData | None = None,
         every: Timer | float | None = None,
         inputs: Component | Sequence[Component] | set[Component] | None = None,
         show_label: bool | None = None,
@@ -80,7 +84,8 @@ class Image(StreamingInput, Component):
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
-        key: int | str | None = None,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = "value",
         mirror_webcam: bool | None = None,
         webcam_options: WebcamOptions | None = None,
         show_share_button: bool | None = None,
@@ -111,7 +116,8 @@ class Image(StreamingInput, Component):
             elem_id: An optional string that is assigned as the id of this component in the HTML DOM. Can be used for targeting CSS styles.
             elem_classes: An optional list of strings that are assigned as the classes of this component in the HTML DOM. Can be used for targeting CSS styles.
             render: If False, component will not render be rendered in the Blocks context. Should be used if the intention is to assign event listeners now but render the component later.
-            key: if assigned, will be used to assume identity across a re-render. Components that have the same key across a re-render will have their value preserved.
+            key: in a gr.render, Components with the same key across re-renders are treated as the same component, not a new component. Properties set in 'preserved_by_key' are not reset across a re-render.
+            preserved_by_key: A list of parameters from this component's constructor. Inside a gr.render() function, if a component is re-rendered with the same key, these (and only these) parameters will be preserved in the UI (if they have been changed by the user or an event listener) instead of re-rendered based on the values provided during constructor.
             mirror_webcam: If True webcam will be mirrored. Default is True.
             show_share_button: If True, will show a share icon in the corner of the component that allows user to share outputs to Hugging Face Spaces Discussions. If False, icon does not appear. If set to None (default behavior), then the icon appears if this Gradio app is launched on Spaces, but not otherwise.
             placeholder: Custom text for the upload area. Overrides default upload messages when provided. Accepts new lines and `#` to designate a heading.
@@ -187,6 +193,7 @@ class Image(StreamingInput, Component):
             elem_classes=elem_classes,
             render=render,
             key=key,
+            preserved_by_key=preserved_by_key,
             value=value,
         )
         self._value_description = (
@@ -208,59 +215,12 @@ class Image(StreamingInput, Component):
         Returns:
             Passes the uploaded image as a `numpy.array`, `PIL.Image` or `str` filepath depending on `type`.
         """
-        if payload is None:
-            return payload
-        if payload.url and payload.url.startswith("data:"):
-            if self.type == "pil":
-                return image_utils.decode_base64_to_image(payload.url)
-            elif self.type == "numpy":
-                return image_utils.decode_base64_to_image_array(payload.url)
-            elif self.type == "filepath":
-                return image_utils.decode_base64_to_file(
-                    payload.url, self.GRADIO_CACHE, self.format
-                )
-        if payload.path is None:
-            raise ValueError("Image path is None.")
-        file_path = Path(payload.path)
-        if payload.orig_name:
-            p = Path(payload.orig_name)
-            name = p.stem
-            suffix = p.suffix.replace(".", "")
-            if suffix in ["jpg", "jpeg"]:
-                suffix = "jpeg"
-        else:
-            name = "image"
-            suffix = "webp"
-
-        if suffix.lower() == "svg":
-            if self.type == "filepath":
-                return str(file_path)
-            raise Error("SVG files are not supported as input images for this app.")
-
-        im = PIL.Image.open(file_path)
-        if self.type == "filepath" and (self.image_mode in [None, im.mode]):
-            return str(file_path)
-
-        exif = im.getexif()
-        # 274 is the code for image rotation and 1 means "correct orientation"
-        if exif.get(274, 1) != 1 and hasattr(ImageOps, "exif_transpose"):
-            try:
-                im = ImageOps.exif_transpose(im)
-            except Exception:
-                warnings.warn(
-                    f"Failed to transpose image {file_path} based on EXIF data."
-                )
-        if suffix.lower() != "gif" and im is not None:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                if self.image_mode is not None:
-                    im = im.convert(self.image_mode)
-        return image_utils.format_image(
-            im,
-            cast(Literal["numpy", "pil", "filepath"], self.type),
-            self.GRADIO_CACHE,
-            name=name,
-            format=suffix,
+        return image_utils.preprocess_image(
+            payload,
+            cache_dir=self.GRADIO_CACHE,
+            format=self.format,
+            image_mode=self.image_mode,
+            type=self.type,
         )
 
     def postprocess(
@@ -272,29 +232,11 @@ class Image(StreamingInput, Component):
         Returns:
             Returns the image as a `FileData` object.
         """
-        if value is None:
-            return None
-        if isinstance(value, str) and value.lower().endswith(".svg"):
-            svg_content = image_utils.extract_svg_content(value)
-            return ImageData(
-                orig_name=Path(value).name,
-                url=f"data:image/svg+xml,{quote(svg_content)}",
-            )
-        if self.streaming:
-            if isinstance(value, np.ndarray):
-                return Base64ImageData(
-                    url=image_utils.encode_image_array_to_base64(value)
-                )
-            elif isinstance(value, PIL.Image.Image):
-                return Base64ImageData(url=image_utils.encode_image_to_base64(value))
-            elif isinstance(value, (Path, str)):
-                return Base64ImageData(
-                    url=image_utils.encode_image_file_to_base64(value)
-                )
-
-        saved = image_utils.save_image(value, self.GRADIO_CACHE, self.format)
-        orig_name = Path(saved).name if Path(saved).exists() else None
-        return ImageData(path=saved, orig_name=orig_name)
+        return image_utils.postprocess_image(
+            value,
+            cache_dir=self.GRADIO_CACHE,
+            format=self.format,
+        )
 
     def api_info_as_output(self) -> dict[str, Any]:
         if self.streaming == "base64":

@@ -42,6 +42,7 @@ from gradio.components import (
     Highlightedtext,
     Image,
     ImageEditor,
+    ImageSlider,
     Json,
     Label,
     LinePlot,
@@ -90,6 +91,7 @@ from gradio.flagging import (
 )
 from gradio.helpers import Info, Progress, Success, Warning, skip, update
 from gradio.helpers import create_examples as Examples  # noqa: N812
+from gradio.i18n import I18n
 from gradio.interface import Interface, TabbedInterface, close_all
 from gradio.layouts import Accordion, Column, Group, Row, Sidebar, Tab, TabItem, Tabs
 from gradio.oauth import OAuthProfile, OAuthToken
@@ -169,6 +171,7 @@ __all__ = [
     "IS_WASM",
     "Image",
     "ImageEditor",
+    "ImageSlider",
     "ImageMask",
     "Info",
     "Interface",
@@ -229,6 +232,7 @@ __all__ = [
     "close_all",
     "deploy",
     "get_package_version",
+    "I18n",
     "load",
     "load_chat",
     "load_ipython_extension",

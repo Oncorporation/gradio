@@ -37,7 +37,6 @@ from gradio import (
     networking,
     processing_utils,
     queueing,
-    strings,
     themes,
     utils,
     wasm_utils,
@@ -51,6 +50,8 @@ from gradio.context import (
     set_render_context,
 )
 from gradio.data_classes import (
+    APIEndpointInfo,
+    APIInfo,
     BlocksConfigDict,
     DeveloperPath,
     FileData,
@@ -70,6 +71,7 @@ from gradio.exceptions import (
     InvalidComponentError,
 )
 from gradio.helpers import create_tracker, skip, special_args
+from gradio.i18n import I18n, I18nData
 from gradio.node_server import start_node_server
 from gradio.route_utils import API_PREFIX, MediaStream
 from gradio.routes import INTERNAL_ROUTES, VERSION, App, Request
@@ -125,12 +127,21 @@ class Block:
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
-        key: int | str | None = None,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = "value",
         visible: bool = True,
         proxy_url: str | None = None,
     ):
-        self._id = Context.id
-        Context.id += 1
+        key_to_id_map = LocalContext.key_to_id_map.get()
+        if key is not None and key_to_id_map and key in key_to_id_map:
+            self.is_render_replacement = True
+            self._id = key_to_id_map[key]
+        else:
+            self.is_render_replacement = False
+            self._id = Context.id
+            Context.id += 1
+            if key is not None and key_to_id_map is not None:
+                key_to_id_map[key] = self._id
         self.visible = visible
         self.elem_id = elem_id
         self.elem_classes = (
@@ -147,6 +158,12 @@ class Block:
         self.temp_files: set[str] = set()
         self.GRADIO_CACHE = get_upload_folder()
         self.key = key
+        self.preserved_by_key = (
+            [preserved_by_key]
+            if isinstance(preserved_by_key, str)
+            else (preserved_by_key or [])
+        )
+
         # Keep tracks of files that should not be deleted when the delete_cache parmameter is set
         # These files are the default value of the component and files that are used in examples
         self.keep_in_cache = set()
@@ -154,6 +171,11 @@ class Block:
 
         if render:
             self.render()
+
+    def unique_key(self) -> int | None:
+        if self.key is None:
+            return None
+        return hash((self.rendered_in._id if self.rendered_in else None, self.key))
 
     @property
     def stateful(self) -> bool:
@@ -186,7 +208,11 @@ class Block:
         root_context = get_blocks_context()
         render_context = get_render_context()
         self.rendered_in = LocalContext.renderable.get()
-        if root_context is not None and self._id in root_context.blocks:
+        if (
+            root_context is not None
+            and self._id in root_context.blocks
+            and not self.is_render_replacement
+        ):
             raise DuplicateBlockError(
                 f"A block with id: {self._id} has already been rendered in the current Blocks."
             )
@@ -194,6 +220,7 @@ class Block:
             if root_context:
                 self.page = root_context.root_block.current_page
             render_context.add(self)
+            self.parent = render_context
         if root_context is not None:
             root_context.blocks[self._id] = self
             self.is_rendered = True
@@ -207,10 +234,10 @@ class Block:
         Removes self from the layout and collection of blocks, but does not delete any event triggers.
         """
         root_context = get_blocks_context()
-        render_context = get_render_context()
-        if render_context is not None:
+        if hasattr(self, "parent") and self.parent is not None:
             try:
-                render_context.children.remove(self)
+                self.parent.children.remove(self)
+                self.parent = None
             except ValueError:
                 pass
         if root_context is not None:
@@ -264,8 +291,6 @@ class Block:
                 config = {**to_add, **config}
         config.pop("render", None)
         config = {**config, "proxy_url": self.proxy_url, "name": self.get_block_class()}
-        if self.rendered_in is not None:
-            config["rendered_in"] = self.rendered_in._id
         for event_attribute in ["_selectable", "_undoable", "_retryable", "likeable"]:
             if (attributable := getattr(self, event_attribute, None)) is not None:
                 config[event_attribute] = attributable
@@ -402,6 +427,8 @@ class BlockContext(Block):
         elem_classes: list[str] | str | None = None,
         visible: bool = True,
         render: bool = True,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = None,
     ):
         """
         Parameters:
@@ -417,6 +444,8 @@ class BlockContext(Block):
             elem_classes=elem_classes,
             visible=visible,
             render=render,
+            key=key,
+            preserved_by_key=preserved_by_key,
         )
 
     TEMPLATE_DIR = DeveloperPath("./templates/")
@@ -914,22 +943,31 @@ class BlocksConfig:
         block: Block | Component,
         renderable: Renderable | None = None,
     ) -> dict:
-        if renderable:
-            if _id not in rendered_ids:
-                return {}
-            if block.key:
-                block.key = f"{renderable._id}-{block.key}"
+        if renderable and _id not in rendered_ids:
+            return {}
         props = block.get_config() if hasattr(block, "get_config") else {}
+
+        skip_none_deletion = []
+        if (
+            renderable and block.key
+        ):  # Nones are important for replacing a value in a keyed component
+            skip_none_deletion = [
+                prop for prop, val in block.constructor_args.items() if val is None
+            ]
+        utils.delete_none(props, skip_props=skip_none_deletion)
+
         block_config = {
             "id": _id,
             "type": block.get_block_name(),
-            "props": utils.delete_none(props),
+            "props": props,
             "skip_api": block.skip_api,
             "component_class_id": getattr(block, "component_class_id", None),
-            "key": block.key,
+            "key": block.unique_key(),
         }
         if renderable:
             block_config["renderable"] = renderable._id
+        if block.rendered_in is not None:
+            block_config["rendered_in"] = block.rendered_in._id
         if not block.skip_api:
             block_config["api_info"] = block.api_info()  # type: ignore
             if hasattr(block, "api_info_as_input"):
@@ -1076,7 +1114,7 @@ class Blocks(BlockContext, BlocksEvents, metaclass=BlocksMeta):
         theme: Theme | str | None = None,
         analytics_enabled: bool | None = None,
         mode: str = "blocks",
-        title: str = "Gradio",
+        title: str | I18nData = "Gradio",
         css: str | None = None,
         css_paths: str | Path | Sequence[str | Path] | None = None,
         js: str | Literal[True] | None = None,
@@ -1150,6 +1188,7 @@ class Blocks(BlockContext, BlocksEvents, metaclass=BlocksMeta):
         self.state_holder: StateHolder
         self.custom_mount_path: str | None = None
         self.pwa = False
+        self.mcp_server = False
 
         # For analytics_enabled and allow_flagging: (1) first check for
         # parameter, (2) check for env variable, (3) default to True/"manual"
@@ -1780,40 +1819,40 @@ Received inputs:
 
         self.validate_inputs(block_fn, inputs)
 
-        if block_fn.preprocess:
-            processed_input = []
-            for i, block in enumerate(block_fn.inputs):
-                if not isinstance(block, components.Component):
-                    raise InvalidComponentError(
-                        f"{block.__class__} Component not a valid input component."
+        processed_input = []
+        for i, block in enumerate(block_fn.inputs):
+            if not isinstance(block, components.Component):
+                raise InvalidComponentError(
+                    f"{block.__class__} Component not a valid input component."
+                )
+            if block.stateful:
+                processed_input.append(state[block._id])
+            else:
+                if block._id in state:
+                    block = state[block._id]
+                inputs_cached = await processing_utils.async_move_files_to_cache(
+                    inputs[i],
+                    block,
+                    check_in_upload_folder=not explicit_call,
+                )
+                if getattr(block, "data_model", None) and inputs_cached is not None:
+                    data_model = cast(
+                        Union[GradioModel, GradioRootModel], block.data_model
                     )
-                if block.stateful:
-                    processed_input.append(state[block._id])
+                    inputs_cached = data_model.model_validate(
+                        inputs_cached, context={"validate_meta": True}
+                    )
+                if isinstance(inputs_cached, (GradioModel, GradioRootModel)):
+                    inputs_serialized = inputs_cached.model_dump()
                 else:
-                    if block._id in state:
-                        block = state[block._id]
-                    inputs_cached = await processing_utils.async_move_files_to_cache(
-                        inputs[i],
-                        block,
-                        check_in_upload_folder=not explicit_call,
-                    )
-                    if getattr(block, "data_model", None) and inputs_cached is not None:
-                        data_model = cast(
-                            Union[GradioModel, GradioRootModel], block.data_model
-                        )
-                        inputs_cached = data_model.model_validate(
-                            inputs_cached, context={"validate_meta": True}
-                        )
-                    if isinstance(inputs_cached, (GradioModel, GradioRootModel)):
-                        inputs_serialized = inputs_cached.model_dump()
-                    else:
-                        inputs_serialized = inputs_cached
-                    if block._id not in state:
-                        state[block._id] = block
-                    state[block._id].value = inputs_serialized
+                    inputs_serialized = inputs_cached
+                if block._id not in state:
+                    state[block._id] = block
+                state._update_value_in_config(block._id, inputs_serialized)
+                if block_fn.preprocess:
                     processed_input.append(block.preprocess(inputs_cached))
-        else:
-            processed_input = inputs
+                else:
+                    processed_input.append(inputs_serialized)
         return processed_input
 
     def validate_outputs(self, block_fn: BlockFunction, predictions: Any | list[Any]):
@@ -1924,11 +1963,16 @@ Received inputs:
                     kwargs["render"] = False
 
                     state[block._id] = block.__class__(**kwargs)
+                    state._update_config(block._id)
                     prediction_value = postprocess_update_dict(
                         block=state[block._id],
                         update_dict=prediction_value,
                         postprocess=block_fn.postprocess,
                     )
+                    if "value" in prediction_value:
+                        state._update_value_in_config(
+                            block._id, prediction_value.get("value")
+                        )
                 elif block_fn.postprocess:
                     if not isinstance(block, components.Component):
                         raise InvalidComponentError(
@@ -1950,7 +1994,9 @@ Received inputs:
                     )
                     if block._id not in state:
                         state[block._id] = block
-                    state[block._id].value = prediction_value_serialized
+                    state._update_value_in_config(
+                        block._id, prediction_value_serialized
+                    )
 
                 outputs_cached = await processing_utils.async_move_files_to_cache(
                     prediction_value,
@@ -2066,6 +2112,7 @@ Received inputs:
         """
         Processes API calls from the frontend. First preprocesses the data,
         then runs the relevant function, then postprocesses the output.
+
         Parameters:
             fn_index: Index of function to run.
             inputs: input data received from the frontend
@@ -2077,7 +2124,14 @@ Received inputs:
             in_event_listener: whether this API call is being made in response to an event listener
             explicit_call: whether this call is being made directly by calling the Blocks function, instead of through an event listener or API route
             root_path: if provided, the root path of the server. All file URLs will be prefixed with this path.
-        Returns: None
+
+        Returns a dictionary with the following keys:
+            - "data": the output data from the function
+            - "is_generating": whether the function is generating output
+            - "iterator": the iterator for the function
+            - "duration": the duration of the function call
+            - "average_duration": the average duration of the function call
+            - "render_config": the render config for the function
         """
         if isinstance(block_fn, int):
             block_fn = self.fns[block_fn]
@@ -2267,6 +2321,12 @@ Received inputs:
             "pwa": self.pwa,
             "pages": self.pages,
             "page": {},
+            "mcp_server": self.mcp_server,
+            "i18n_translations": (
+                getattr(self.i18n_instance, "translations_dict", None)
+                if getattr(self, "i18n_instance", None) is not None
+                else None
+            ),
         }
         config.update(self.default_config.get_config())  # type: ignore
         config["connect_heartbeat"] = utils.connect_heartbeat(
@@ -2409,7 +2469,7 @@ Received inputs:
         *,
         height: int = 500,
         width: int | str = "100%",
-        favicon_path: str | None = None,
+        favicon_path: str | Path | None = None,
         ssl_keyfile: str | None = None,
         ssl_certfile: str | None = None,
         ssl_keyfile_password: str | None = None,
@@ -2432,7 +2492,9 @@ Received inputs:
         node_port: int | None = None,
         ssr_mode: bool | None = None,
         pwa: bool | None = None,
+        mcp_server: bool | None = None,
         _frontend: bool = True,
+        i18n: I18n | None = None,
     ) -> tuple[App, str, str]:
         """
         Launches a simple web server that serves the demo. Can also be used to create a
@@ -2445,7 +2507,7 @@ Received inputs:
             auth: If provided, username and password (or list of username-password tuples) required to access app. Can also provide function that takes username and password and returns True if valid login.
             auth_message: If provided, HTML message provided on login page.
             prevent_thread_lock: By default, the gradio app blocks the main thread while the server is running. If set to True, the gradio app will not block and the gradio server will terminate as soon as the script finishes.
-            show_error: If True, any errors in the gradio app will be displayed in an alert modal and printed in the browser console log
+            show_error: If True, any errors in the gradio app will be displayed in an alert modal and printed in the browser console log. They will also be displayed in the alert modal of downstream apps that gr.load() this app.
             server_port: will start gradio app on this port (if available). Can be set by environment variable GRADIO_SERVER_PORT. If None, will search for an available port starting at 7860.
             server_name: to make app accessible on local network, set this to "0.0.0.0". Can be set by environment variable GRADIO_SERVER_NAME. If None, will use "127.0.0.1".
             max_threads: the maximum number of total threads that the Gradio app can generate in parallel. The default is inherited from the starlette library (currently 40).
@@ -2472,6 +2534,8 @@ Received inputs:
             strict_cors: If True, prevents external domains from making requests to a Gradio server running on localhost. If False, allows requests to localhost that originate from localhost but also, crucially, from "null". This parameter should normally be True to prevent CSRF attacks but may need to be False when embedding a *locally-running Gradio app* using web components.
             ssr_mode: If True, the Gradio app will be rendered using server-side rendering mode, which is typically more performant and provides better SEO, but this requires Node 20+ to be installed on the system. If False, the app will be rendered using client-side rendering mode. If None, will use GRADIO_SSR_MODE environment variable or default to False.
             pwa: If True, the Gradio app will be set up as an installable PWA (Progressive Web App). If set to None (default behavior), then the PWA feature will be enabled if this Gradio app is launched on Spaces, but not otherwise.
+            i18n: An I18n instance containing custom translations, which are used to translate strings in our components (e.g. the labels of components or Markdown strings). This feature can only be used to translate static text in the frontend, not values in the backend.
+            mcp_server: If True, the Gradio app will be set up as an MCP server and documented functions will be added as MCP tools. If None (default behavior), then the GRADIO_MCP_SERVER environment variable will be used to determine if the MCP server should be enabled (which is "True" on Hugging Face Spaces).
         Returns:
             app: FastAPI app object that is running the demo
             local_url: Locally accessible link to the demo
@@ -2576,7 +2640,6 @@ Received inputs:
         self.max_threads = max_threads
         self._queue.max_thread_count = max_threads
         self.transpile_to_js(quiet=quiet)
-        self.config = self.get_config_file()
 
         self.ssr_mode = (
             False
@@ -2609,6 +2672,29 @@ Received inputs:
             strict_cors=strict_cors,
             ssr_mode=self.ssr_mode,
         )
+
+        mcp_subpath = API_PREFIX + "/mcp"
+        if mcp_server is None:
+            mcp_server = os.environ.get("GRADIO_MCP_SERVER", "False").lower() == "true"
+        if mcp_server:
+            try:
+                import gradio.mcp
+            except ImportError as e:
+                raise ImportError(
+                    "In order to use `mcp_server=True`, you must install gradio with the `mcp` extra. Please install it with `pip install gradio[mcp]`"
+                ) from e
+            try:
+                self.mcp_server_obj = gradio.mcp.GradioMCPServer(self)
+                self.mcp_server_obj.launch_mcp_on_sse(
+                    self.server_app, mcp_subpath, self.root_path
+                )
+                self.mcp_server = True
+            except Exception as e:
+                self.mcp_server = False
+                if not quiet:
+                    print(f"Error launching MCP server: {e}")
+
+        self.config = self.get_config_file()
 
         if self.is_running:
             if not isinstance(self.local_url, str):
@@ -2650,7 +2736,7 @@ Received inputs:
             self.server = server
             self.is_running = True
             self.is_colab = utils.colab_check()
-            self.is_kaggle = utils.kaggle_check()
+            self.is_hosted_notebook = utils.is_hosted_notebook()
             self.share_server_address = share_server_address
             self.share_server_protocol = share_server_protocol or (
                 "http" if share_server_address is not None else "https"
@@ -2665,9 +2751,9 @@ Received inputs:
             )
             if not wasm_utils.IS_WASM and not self.is_colab and not quiet:
                 s = (
-                    strings.en["RUNNING_LOCALLY_SSR"]
+                    "* Running on local URL:  {}://{}:{}, with SSR ⚡ (experimental, to disable set `ssr_mode=False` in `launch()`)"
                     if self.ssr_mode
-                    else strings.en["RUNNING_LOCALLY"]
+                    else "* Running on local URL:  {}://{}:{}"
                 )
                 print(s.format(self.protocol, self.server_name, self.server_port))
 
@@ -2683,7 +2769,7 @@ Received inputs:
                 )
                 if not resp.is_success:
                     raise Exception(
-                        f"Couldn’t start the app because '{resp.url}' failed (code {resp.status_code}). Check your network or proxy settings to ensure localhost is accessible."
+                        f"Couldn't start the app because '{resp.url}' failed (code {resp.status_code}). Check your network or proxy settings to ensure localhost is accessible."
                     )
             else:
                 # NOTE: One benefit of the code above dispatching `startup_events()` via a self HTTP request is
@@ -2698,32 +2784,15 @@ Received inputs:
                 # So we use create_task() instead. This is a best-effort fallback in the Wasm env but it doesn't guarantee that all the tasks are completed before they are needed.
                 asyncio.create_task(self.run_extra_startup_events())
 
-        self.is_sagemaker = (
-            False  # TODO: fix Gradio's behavior in sagemaker and other hosted notebooks
-        )
         if share is None:
-            if self.is_colab:
+            if self.is_colab or self.is_hosted_notebook:
                 if not quiet:
                     print(
-                        "Running Gradio in a Colab notebook requires sharing enabled. Automatically setting `share=True` (you can turn this off by setting `share=False` in `launch()` explicitly).\n"
-                    )
-                self.share = True
-            elif self.is_kaggle:
-                if not quiet:
-                    print(
-                        "Kaggle notebooks require sharing enabled. Setting `share=True` (you can turn this off by setting `share=False` in `launch()` explicitly).\n"
-                    )
-                self.share = True
-            elif self.is_sagemaker:
-                if not quiet:
-                    print(
-                        "Sagemaker notebooks may require sharing enabled. Setting `share=True` (you can turn this off by setting `share=False` in `launch()` explicitly).\n"
+                        "It looks like you are running Gradio on a hosted a Jupyter notebook. For the Gradio app to work, sharing must be enabled. Automatically setting `share=True` (you can turn this off by setting `share=False` in `launch()` explicitly).\n"
                     )
                 self.share = True
             else:
                 self.share = False
-                # GRADIO_SHARE environment variable for forcing 'share=True'
-                # GRADIO_SHARE=True => share=True
                 share_env = os.getenv("GRADIO_SHARE")
                 if share_env is not None and share_env.lower() == "true":
                     self.share = True
@@ -2735,6 +2804,7 @@ Received inputs:
                 f"Monitoring URL: {self.local_url}monitoring/{self.app.analytics_key}"
             )
         self.enable_monitoring = enable_monitoring in [True, None]
+        self.i18n_instance = i18n
 
         # If running in a colab or not able to access localhost,
         # a shareable link must be created.
@@ -2750,11 +2820,17 @@ Received inputs:
 
         if self.is_colab and not quiet:
             if debug:
-                print(strings.en["COLAB_DEBUG_TRUE"])
+                print(
+                    "Colab notebook detected. This cell will run indefinitely so that you can see errors and logs. To turn off, set debug=False in launch()."
+                )
             else:
-                print(strings.en["COLAB_DEBUG_FALSE"])
+                print(
+                    "Colab notebook detected. To show errors in colab notebook, set debug=True in launch()"
+                )
             if not self.share:
-                print(strings.en["COLAB_WARNING"].format(self.server_port))
+                print(
+                    "Note: opening Chrome Inspector may crash demo inside Colab notebooks."
+                )
 
         if self.share:
             if self.space_id:
@@ -2782,9 +2858,11 @@ Received inputs:
                     self.share_url = urlunparse(
                         (self.share_server_protocol,) + parsed_url[1:]
                     )
-                print(strings.en["SHARE_LINK_DISPLAY"].format(self.share_url))
+                print(f"* Running on public URL: {self.share_url}")
                 if not (quiet):
-                    print(strings.en["SHARE_LINK_MESSAGE"])
+                    print(
+                        "\nThis share link expires in 1 week. For free permanent hosting and GPU upgrades, run `gradio deploy` from the terminal in the working directory to deploy to Hugging Face Spaces (https://huggingface.co/spaces)"
+                    )
             except Exception as e:
                 if self.analytics_enabled:
                     analytics.error_analytics("Not able to set up tunnel")
@@ -2792,25 +2870,25 @@ Received inputs:
                 self.share = False
                 if isinstance(e, ChecksumMismatchError):
                     print(
-                        strings.en["COULD_NOT_GET_SHARE_LINK_CHECKSUM"].format(
-                            BINARY_PATH
-                        )
+                        f"\nCould not create share link. Checksum mismatch for file: {BINARY_PATH}."
                     )
                 elif Path(BINARY_PATH).exists():
-                    print(strings.en["COULD_NOT_GET_SHARE_LINK"])
+                    print(
+                        "\nCould not create share link. Please check your internet connection or our status page: https://status.gradio.app."
+                    )
                 else:
                     print(
-                        strings.en["COULD_NOT_GET_SHARE_LINK_MISSING_FILE"].format(
-                            BINARY_PATH,
-                            BINARY_URL,
-                            BINARY_FILENAME,
-                            BINARY_FOLDER,
-                        )
+                        f"\nCould not create share link. Missing file: {BINARY_PATH}. \n\nPlease check your internet connection. This can happen if your antivirus software blocks the download of this file. You can install manually by following these steps: \n\n1. Download this file: {BINARY_URL}\n2. Rename the downloaded file to: {BINARY_FILENAME}\n3. Move the file to this location: {BINARY_FOLDER}"
                     )
         else:
             if not quiet and not wasm_utils.IS_WASM:
-                print(strings.en["PUBLIC_SHARE_TRUE"])
+                print("* To create a public link, set `share=True` in `launch()`.")
             self.share_url = None
+
+        if self.mcp_server:
+            print(
+                f"\n🔨 MCP server (using SSE) running at: {self.share_url or self.local_url.rstrip('/')}/{mcp_subpath.lstrip('/')}/sse"
+            )
 
         if inbrowser and not wasm_utils.IS_WASM:
             link = self.share_url if self.share and self.share_url else self.local_url
@@ -3014,14 +3092,14 @@ Received inputs:
         for startup_event in self.extra_startup_events:
             await startup_event()
 
-    def get_api_info(self, all_endpoints: bool = False) -> dict[str, Any] | None:
+    def get_api_info(self, all_endpoints: bool = False) -> APIInfo | None:
         """
         Gets the information needed to generate the API docs from a Blocks.
         Parameters:
             all_endpoints: If True, returns information about all endpoints, including those with show_api=False.
         """
         config = self.config
-        api_info = {"named_endpoints": {}, "unnamed_endpoints": {}}
+        api_info: APIInfo = {"named_endpoints": {}, "unnamed_endpoints": {}}
 
         for fn in self.fns.values():
             if not fn.fn or fn.api_name is False:
@@ -3029,8 +3107,15 @@ Received inputs:
             if not all_endpoints and not fn.show_api:
                 continue
 
-            dependency_info = {"parameters": [], "returns": [], "show_api": fn.show_api}
+            dependency_info: APIEndpointInfo = {
+                "parameters": [],
+                "returns": [],
+                "show_api": fn.show_api,
+            }
             fn_info = utils.get_function_params(fn.fn)  # type: ignore
+            description, _ = utils.get_function_description(fn.fn)
+            if description:
+                dependency_info["description"] = description
             skip_endpoint = False
 
             inputs = fn.inputs

@@ -46,6 +46,7 @@
 		"edit": "Editar",
 		"empty": "Vacío",
 		"error": "Error",
+		"flag": "Marcar",
 		"hosted_on": "Alojado en",
 		"loading": "Cargando",
 		"logo": "logo",
@@ -87,7 +88,8 @@
 		"runtime_error": "hay un error de ejecución",
 		"space_not_working": "\"El Space no funciona porque\" {0}",
 		"space_paused": "el space está pausado",
-		"use_via_api": "Usar vía API"
+		"use_via_api": "Usar vía API",
+		"use_via_api_or_mcp": "Usar vía API o MCP"
 	},
 	"file": {
 		"uploading": "Subiendo..."
