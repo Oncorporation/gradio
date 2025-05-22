@@ -1,5 +1,27 @@
 # gradio_client
 
+## 1.10.1
+
+### Features
+
+- [#11185](https://github.com/gradio-app/gradio/pull/11185) [`e64b83b`](https://github.com/gradio-app/gradio/commit/e64b83bf42a813d9269e519189523f8390a72ec4) - Evaluate index variable in argument description.  Thanks @emmanuel-ferdman!
+
+### Fixes
+
+- [#11172](https://github.com/gradio-app/gradio/pull/11172) [`b618571`](https://github.com/gradio-app/gradio/commit/b618571ed17a8cece4bf9f1f55ed2e8bf7b59c46) - Fix python client SSE decoding issue.  Thanks @freddyaboulton!
+
+## 1.10.0
+
+### Features
+
+- [#10984](https://github.com/gradio-app/gradio/pull/10984) [`8dab577`](https://github.com/gradio-app/gradio/commit/8dab5771c7d952c76f325681dbf364119c91b0b1) - Let Gradio apps also be MCP Servers.  Thanks @abidlabs!
+
+## 1.9.1
+
+### Fixes
+
+- [#11093](https://github.com/gradio-app/gradio/pull/11093) [`cb322df`](https://github.com/gradio-app/gradio/commit/cb322df1f4df858590e760a82f6410f3b6db899b) - Update client.py to always send file data, even for files without extensions.  Thanks @edmcman!
+
 ## 1.9.0
 
 ### Features
