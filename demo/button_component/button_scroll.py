@@ -22,6 +22,6 @@ with gr.Blocks() as demo:
     btn1.click(fn=slow_function, inputs=text_input, outputs=output, scroll_on_click=True, scroll_to_output=False)
     btn2.click(fn=slow_function, inputs=text_input, outputs=output, scroll_on_click=False, scroll_to_output=True)
     btn3.click(fn=slow_function, inputs=text_input, outputs=output, scroll_on_click=True, scroll_to_output=True)
-    btn4.click(fn=slow_function, inputs=text_input, outputs=output)
+    btn4.click(fn=slow_function, inputs=text_input, outputs=output, scroll_on_click=False, scroll_to_output=False)
 
 demo.launch()
