@@ -24,12 +24,6 @@
 
 - @gradio/statustracker@0.10.12
 
-## 0.5.17
-
-### Dependency updates
-
-- @gradio/statustracker@0.10.12
-
 ## 0.5.16
 
 ### Features
