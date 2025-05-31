@@ -515,8 +515,10 @@ class BlockContext(Block):
         if getattr(self, "allow_expected_parents", True):
             self.fill_expected_parents()
 
-        # Special handling for sorting Tab components
+        # Special handling for sorting Tab components upon initial creation
         from gradio.layouts.tabs import Tab, Tabs
+        if isinstance(self, Tabs):
+            self.sort_tabs()
 
         if (
             isinstance(self, Tab)
@@ -1969,23 +1971,42 @@ Received inputs:
                     prediction_value = prediction_value.constructor_args.copy()
                     prediction_value["__type__"] = "update"
                 if utils.is_prop_update(prediction_value):
-                    kwargs = state[block._id].constructor_args.copy()
-                    kwargs.update(prediction_value)
-                    kwargs.pop("value", None)
-                    kwargs.pop("__type__")
-                    kwargs["render"] = False
+                    target_block_instance = state[block._id] or self.blocks.get(block._id) # self.blocks here refers to Blocks.blocks
+                    if not target_block_instance:
+                        # This case should ideally not happen if block._id is valid
+                        output.append(prediction_value) # Or handle error
+                        continue
 
-                    state[block._id] = block.__class__(**kwargs)
+                    kwargs = target_block_instance.constructor_args.copy()
+                    update_payload = prediction_value.copy()
+                    update_payload.pop("__type__", None)
+
+                    for key, value_update in update_payload.items():
+                        if hasattr(target_block_instance, key):
+                            setattr(target_block_instance, key, value_update)
+
+                    # If the block is Tabs and sort_order was updated, re-sort
+                    from gradio.layouts.tabs import Tabs # Import locally
+                    if isinstance(target_block_instance, Tabs) and "sort_order" in update_payload:
+                        target_block_instance.sort_tabs()
+
+                    # If state contains the block, update its config.
+                    # This should happen after potential modifications like sort_tabs
+                    
+                    state[block._id] = target_block_instance # Ensure state has the modified instance
                     state._update_config(block._id)
+
                     prediction_value = postprocess_update_dict(
-                        block=state[block._id],
-                        update_dict=prediction_value,
+                        block=target_block_instance, # Use the potentially updated instance
+                        update_dict=prediction_value, # Pass original prediction_value with __type__
                         postprocess=block_fn.postprocess,
                     )
-                    if "value" in prediction_value:
-                        state._update_value_in_config(
-                            block._id, prediction_value.get("value")
-                        )
+                    if "value" in prediction_value: 
+                         if block._id in state: # Ensure block is in state before updating value in config
+                            state._update_value_in_config(
+                                block._id, prediction_value.get("value")
+                            )
+
                 elif block_fn.postprocess:
                     if not isinstance(block, components.Component):
                         raise InvalidComponentError(
