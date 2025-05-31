@@ -2022,7 +2022,7 @@ Received inputs:
                     state._update_config(block._id)
 
                     prediction_value = postprocess_update_dict(
-                        block=target_block_instance, # Use the potentially updated instance
+                        block=state[block._id], 
                         update_dict=prediction_value, # Pass original prediction_value with __type__
                         postprocess=block_fn.postprocess,
                     )
